@@ -1,0 +1,1 @@
+// While it is also possible to merge the In-Order and Post-order traversal together, it is not suitable to do so in a generic library. It would either mess up the arguments or the return, yet the time complexity remains the same. If you do need this optimization feature, please try to override the DFS method as well as this generator method in a derived class.
