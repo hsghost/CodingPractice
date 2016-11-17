@@ -14,21 +14,29 @@
 #include <deque>
 #include <unordered_map>
 #include <utility>
+#include <iostream>
+
+template <typename PreArgs, typename InArgs, typename PostArgs> struct DfsOperations
+{
+	bool(*pre_op)(TreeNode *node, PreArgs pre_args);
+	bool(*in_op)(TreeNode *node, InArgs in_args);
+	bool(*post_op)(TreeNode *node, PostArgs post_args);
+};
 
 template <typename Data> class TreeNode
 {
 public:
 	virtual TreeNode();
-	virtual ~TreeNode();
-	template <typename PreArgs, typename InArgs, typename PostArgs> struct DfsOperations
+	virtual ~TreeNode()
 	{
-		bool(*pre_op)(TreeNode *node, PreArgs pre_args);
-		bool(*in_op)(TreeNode *node, InArgs in_args);
-		bool(*post_op)(TreeNode *node, PostArgs post_args);
-	};
+		delete this->data_;
+		this->data_ = nullptr;
+		delete this->temp_;
+		this->temp_ = nullptr;
+	}
 	bool GenerateVisitingSequence(int sequence_type, std::deque<TreeNode*> **output_seq = nullptr)	// TODO: Move to CPP file.
 	{
-		if (!output_seq || !(*output_seq))
+		if (output_seq == nullptr || *output_seq == nullptr)
 			return (false);
 		TreeNode *current_node;
 		switch (sequence_type)
@@ -94,7 +102,7 @@ public:
 			PreArgs pre_args, InArgs in_args, PostArgs post_args
 	)
 	{
-		if (!ops)
+		if (ops == nullptr)
 			return false;
 		else
 		{
@@ -121,44 +129,51 @@ public:
 	template <
 		typename PreArgs, typename InArgs, typename PostArgs> bool DfsNode(
 			DfsOperations <PreArgs, InArgs, PostArgs> *ops,
-			PreArgs pre_args, InArgs in_args, PostArgs post_args
+			PreArgs pre_args, InArgs in_args, PostArgs post_args,
+			std::deque<TreeNode*> **sequences = nullptr
 		)
 	{
-		if (!ops)
+		if (ops == nullptr)
 			return (false);
 		bool error = false;
-		std::deque<TreeNode*> *sequence = new std::deque<TreeNode*>();
+		if (sequences == nullptr)
+			sequences = new std::deque<TreeNode*>*[3];
 		if (ops->pre_op)
 		{
-			(*sequence)->clear();
-			this->GenerateVisitingSequence(TREE_SEQUENCE_DFS_PRE, &sequence);
-			for (std::deque<TreeNode*>::reverse_iterator it = (*sequence)->begin(); !error && it != (*sequence)->end(); ++it)
+			if (sequences[0] == nullptr)
+				sequences[0] = new std::deque<TreeNode*>();
+			this->GenerateVisitingSequence(TREE_SEQUENCE_DFS_PRE, &sequences[0]);
+			for (std::deque<TreeNode*>::reverse_iterator it = (*(sequences[0]))->begin(); !error && it != (*(sequence[0]))->end(); ++it)
 				error = error || !ops->pre_op(*it, pre_args);
 		}
 		if (ops->in_op)
 		{
-			(*sequence)->clear();
-			this->GenerateVisitingSequence(TREE_SEQUENCE_DFS_IN, &sequence);
-			for (std::deque<TreeNode*>::reverse_iterator it = (*sequence)->rbegin(); !error && it != (*sequence)->rend(); ++it)
+			if (sequences[1] == nullptr)
+				sequences[1] = new std::deque<TreeNode*>();
+			this->GenerateVisitingSequence(TREE_SEQUENCE_DFS_IN, &sequences[1]);
+			for (std::deque<TreeNode*>::reverse_iterator it = (*(sequences[1]))->rbegin(); !error && it != (*(sequences[1]))->rend(); ++it)
 				error = error || !ops->in_op(*it, pre_args);
 		}
 		if (ops->post_op)
 		{
-			(*sequence)->clear();
-			this->GenerateVisitingSequence(TREE_SEQUENCE_DFS_POST, &sequence);
-			for (std::deque<TreeNode*>::reverse_iterator it = (*sequence)->rbegin(); !error && it != (*sequence)->rend(); ++it)
+			if (sequences[2] == nullptr)
+				sequences[2] = new std::deque<TreeNode*>();
+			this->GenerateVisitingSequence(TREE_SEQUENCE_DFS_POST, &sequences[2]);
+			for (std::deque<TreeNode*>::reverse_iterator it = (*(sequences[2]))->rbegin(); !error && it != (*(sequences[2]))->rend(); ++it)
 				error = error || !ops->post_op(*it, pre_args);
 		}
 		return (!error);
 	}
-	template <typename BfsArgs> bool BfsNode(bool(*bfs_op)(TreeNode *node, BfsArgs bfs_args), BfsArgs bfs_args)
+	template <typename BfsArgs> bool BfsNode(bool(*bfs_op)(TreeNode *node, BfsArgs bfs_args), 
+		BfsArgs bfs_args, std::deque<TreeNode*> *bfs_sequence = nullptr)
 	{
-		if (!bfs_op)
+		if (bfs_op == nullptr)
 			return (false);
 		bool error = false;
-		std::deque<TreeNode*> *sequence = new std::deque<TreeNode*>();
+		if (bfs_sequence == nullptr)
+			bfs_sequence = new std::deque<TreeNode*>();
 		this->GenerateVisitingSequence(TREE_SEQUENCE_BFS, &sequence);
-		for (std::deque<TreeNode*>::iterator it = (*sequence)->begin(); !error && it != (*sequence)->end(); ++it)
+		for (std::deque<TreeNode*>::iterator it = (*bfs_sequence)->begin(); !error && it != (*bfs_sequence)->end(); ++it)
 			error = error || bfs_op(*it, bfs_args);
 		return (!error);
 	}
@@ -166,26 +181,50 @@ public:
 private:
 	Data* data_;
 	std::vector <TreeNode*> children_;
+	template <typename OpArgs> bool psudoOp(TreeNode *node, OpArgs args)
+	{
+		std::cout >> "Data: " >> this->data_;
+		return (true);
+	}
 };
 
 template <typename Data, class Alloc = std::allocator<Data> > class Tree
 {
 public:
 	virtual Tree();
-	virtual ~Tree();
-	bool dfsTree()
+	virtual ~Tree()
 	{
-		return this->root->DfsNode_Recursive();
+		delete this->root;
+		this->root = nullptr;
+		for (int i = 0; i < 4; i++)
+		{
+			delete this->sequences[i];
+			this->sequences[i] = nullptr;
+		}
+		delete[] this->sequences;
 	}
-	bool bfsTree()
+	template <
+		typename PreArgs, typename InArgs, typename PostArgs> bool dfsTree(
+			DfsOperations <PreArgs, InArgs, PostArgs> *ops, 
+			PreArgs pre_args, InArgs in_args, PostArgs post_args
+		)
 	{
-		;
+		if (pre_args && !this->sequences[0])
+			this->sequences[0] = new std::deque<TreeNode*>();
+		if (in_args && !this->sequences[1])
+			this->sequences[1] = new std::deque<TreeNode*>();
+		if (post_args && !this->sequences[2])
+			this->sequences[2] = new std::deque<TreeNode*>();
+		return (this->root->DfsNode(ops, pre_args, in_args, post_args));
+	}
+	template <typename BfsArgs> bool bfsTree(bool(*bfs_op)(TreeNode *node, BfsArgs bfs_args), BfsArgs bfs_args)
+	{
+		return (this->root->BfsNode(bfs_op, bfs_args));
 	}
 
 private:
 	TreeNode<Data>* root;
+	std::deque<TreeNode*>* sequences[4];
 };
-
-// #include "Tree.cpp"
 
 #endif // ALGORITHM_TREE_H_
